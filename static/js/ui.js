@@ -115,7 +115,25 @@ export function displayArticle(containerId, articleData, contentKey = 'summary')
     if (articleData) {
         const title = articleData.title || '';
         const url = articleData.url || '';
-        const content = articleData[contentKey] || '';
+        
+        // Determine what content to display based on container type
+        let displayContent = '';
+        let contentLabel = '';
+        
+        if (containerId === 'grokipedia-content') {
+            // Show TLDR for Grokipedia
+            displayContent = articleData.tldr || articleData[contentKey] || '';
+            contentLabel = 'TLDR';
+        } else if (containerId === 'wikipedia-content') {
+            // Show article summary for Wikipedia
+            displayContent = articleData.article_summary || articleData[contentKey] || '';
+            contentLabel = 'About this article';
+        } else {
+            // Default behavior for other containers
+            displayContent = articleData[contentKey] || '';
+            contentLabel = 'Content';
+        }
+        
         const sections = articleData.sections || [];
         
         const titleHtml = url 
@@ -129,13 +147,16 @@ export function displayArticle(containerId, articleData, contentKey = 'summary')
         container.innerHTML = `
             ${titleHtml}
             ${urlHtml}
-            <div class="content">${escapeHtml(content)}</div>
+            <div class="content-label">${escapeHtml(contentLabel)}</div>
+            <div class="content">${escapeHtml(displayContent)}</div>
+            ${sections.length > 0 ? `
             <div class="sections">
                 <strong>Sections:</strong>
                 <ul>
                     ${sections.map(s => `<li>• ${escapeHtml(s)}</li>`).join('')}
                 </ul>
             </div>
+            ` : ''}
         `;
         
         // Update scroll indicators after content is rendered

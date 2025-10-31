@@ -7,7 +7,7 @@ from app.utils.url_parser import (
 )
 from app.utils.sdk_manager import get_cached_client
 from app.services.article_fetcher import scrape_wikipedia, fetch_grokipedia_article
-from app.services.comparison_service import compare_articles
+from app.services.comparison_service import compare_articles, generate_grokipedia_tldr, generate_wikipedia_summary
 
 
 bp = Blueprint('main', __name__)
@@ -182,6 +182,16 @@ def compare():
         if grokipedia_data and wikipedia_data:
             comparison = compare_articles(grokipedia_data, wikipedia_data)
             results['comparison'] = comparison
+            
+            # Generate TLDR for Grokipedia article
+            grokipedia_tldr = generate_grokipedia_tldr(grokipedia_data)
+            if grokipedia_tldr:
+                grokipedia_data['tldr'] = grokipedia_tldr
+            
+            # Generate summary about Wikipedia article
+            wikipedia_summary = generate_wikipedia_summary(wikipedia_data)
+            if wikipedia_summary:
+                wikipedia_data['article_summary'] = wikipedia_summary
         else:
             results['comparison'] = None
             missing = []
