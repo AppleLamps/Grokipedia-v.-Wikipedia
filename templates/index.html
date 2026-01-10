@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grokipedia v. Wikipedia · Article Comparator</title>
+    <title>Grokipedia - Article Studio</title>
     
     <!-- CSS Files -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
@@ -45,25 +45,10 @@
             <div class="header">
                 <h1>
                     <button class="home-link" id="homeLink" aria-label="Return to home page" title="Return to home page">
-                        Grokipedia v. Wikipedia
+                        Grokipedia
                     </button>
-                    <span class="badge" aria-label="version">v0.1</span>
+                    <span class="badge" aria-label="version">v0.2</span>
                 </h1>
-                <p>Article Comparison Tool</p>
-            </div>
-
-            <div class="mode-toggle-card" aria-live="polite">
-                <div class="mode-toggle-row">
-                    <span class="mode-label">Compare</span>
-                    <label class="mode-switch">
-                        <input type="checkbox" id="editsModeToggle" aria-label="Toggle edits mode">
-                        <span class="mode-slider" aria-hidden="true"></span>
-                    </label>
-                    <span class="mode-label">Edits</span>
-                </div>
-                <p class="mode-description" id="modeDescription">
-                    Compare Grokipedia and Wikipedia articles side-by-side.
-                </p>
             </div>
 
             <div class="search-container">
@@ -90,6 +75,18 @@
                     <div class="suggestions-empty hidden">No articles found. Try a different search term.</div>
                 </div>
             </div>
+
+            <div class="mode-toggle-card" role="radiogroup" aria-label="Mode selection">
+                <button class="mode-pill is-active" type="button" data-mode="compare" role="radio" aria-checked="true">
+                    Compare
+                </button>
+                <button class="mode-pill" type="button" data-mode="edits" role="radio" aria-checked="false">
+                    Edit
+                </button>
+                <button class="mode-pill" type="button" data-mode="create" role="radio" aria-checked="false">
+                    Create
+                </button>
+            </div>
         </div>
 
         <div id="loading" class="loading hidden">
@@ -102,7 +99,7 @@
         <div id="results-container" class="hidden">
             <div class="results-header">
                 <button class="home-link results-home-link" id="resultsHomeLink" aria-label="Return to home page" title="Return to home page">
-                    Grokipedia v. Wikipedia
+                    Grokipedia
                 </button>
                 <button class="new-search-btn" id="newSearchBtn" aria-label="Start new search" title="Start new search">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -187,6 +184,23 @@
                     </div>
                     <div class="comparison-content" id="edits-content"></div>
                 </div>
+            </div>
+            <div class="grok-article hidden" id="create-box">
+                <div class="grok-article-header">
+                    <div class="grok-article-meta" id="create-meta">
+                        <span class="meta-icon">&#10003;</span>
+                        <span>Fact-checked by Grok</span>
+                        <span class="meta-time">just now</span>
+                    </div>
+                    <button class="tool-btn copy-btn" id="copyCreateBtn" aria-label="Copy Grokipedia draft" title="Copy Grokipedia draft">
+                        <svg class="copy-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M5 3H2C1.44772 3 1 3.44772 1 4V12C1 12.5523 1.44772 13 2 13H10C10.5523 13 11 12.5523 11 12V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M5 9L5 3C5 2.44772 5.44772 2 6 2H12C12.5523 2 13 2.44772 13 3V9C13 9.55228 12.5523 10 12 10H6C5.44772 10 5 9.55228 5 9Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                        Copy
+                    </button>
+                </div>
+                <div class="grok-article-content" id="create-content"></div>
             </div>
         </div>
     </div>

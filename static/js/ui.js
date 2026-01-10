@@ -246,6 +246,34 @@ export function displayComparison(markdown, error) {
 }
 
 /**
+ * Display a generated Grokipedia article draft
+ * @param {string} markdown - Markdown content to render
+ * @param {Object} meta - Metadata for the draft
+ */
+export function displayCreatedArticle(markdown, meta = {}) {
+    const createContent = document.getElementById('create-content');
+    const createMeta = document.getElementById('create-meta');
+
+    if (!createContent) return;
+
+    if (!markdown) {
+        createContent.textContent = 'No draft returned.';
+        return;
+    }
+
+    createContent.innerHTML = renderMarkdown(markdown);
+
+    if (createMeta) {
+        const timeLabel = meta.timeLabel || 'just now';
+        createMeta.innerHTML = `
+            <span class="meta-icon">&#10003;</span>
+            <span>Fact-checked by Grok</span>
+            <span class="meta-time">${escapeHtml(timeLabel)}</span>
+        `;
+    }
+}
+
+/**
  * Set button disabled state
  * @param {string} buttonId - ID of button element
  * @param {boolean} disabled - Disabled state

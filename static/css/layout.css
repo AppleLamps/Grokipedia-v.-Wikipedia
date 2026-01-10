@@ -35,7 +35,7 @@
     color: white;
     font-size: 18px;
     font-weight: 500;
-    font-family: 'Georgia', serif;
+    font-family: var(--font-display);
     margin: 0;
 }
 
@@ -49,7 +49,7 @@
     text-align: center;
     padding: 40px 20px;
     color: var(--muted);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-body);
 }
 
 .sidebar-empty p {
@@ -84,7 +84,7 @@
     font-size: 16px;
     font-weight: 500;
     margin: 0 0 8px 0;
-    font-family: 'Georgia', serif;
+    font-family: var(--font-display);
     padding-right: 24px;
 }
 
@@ -94,7 +94,7 @@
     font-size: 12px;
     color: var(--muted-2);
     margin-bottom: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-body);
 }
 
 .saved-comparison-item .saved-comparison-date {
@@ -168,7 +168,7 @@
     border-radius: 10px;
     min-width: 18px;
     text-align: center;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-body);
     border: 2px solid var(--bg);
 }
 
@@ -176,7 +176,7 @@
     .sidebar {
         width: 85vw;
     }
-    
+
     .sidebar-toggle-btn.floating {
         bottom: 16px;
         right: 16px;
@@ -194,6 +194,71 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+}
+
+/* Create mode: top-left header like Grokipedia.com */
+body.create-mode-results {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 0;
+}
+
+body.create-mode-results .container {
+    max-width: 100%;
+    width: 100%;
+    padding: 0 120px;
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+body.create-mode-results .initial-view {
+    display: none;
+}
+
+body.create-mode-results .results-header {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    padding: 16px 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--panel-brd);
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+body.create-mode-results .results-header .home-link {
+    font-size: 20px;
+}
+
+body.create-mode-results .create-search-bar {
+    flex: 1;
+    max-width: 500px;
+}
+
+body.create-mode-results #results-container {
+    width: 100%;
+    max-width: 100%;
+    padding-top: 24px;
+}
+
+body.create-mode-results .grok-article {
+    max-width: 980px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+@media (max-width: 1200px) {
+    body.create-mode-results .container {
+        padding: 0 80px;
+    }
+}
+
+@media (max-width: 768px) {
+    body.create-mode-results .container {
+        padding: 0 40px;
+    }
 }
 
 body.has-results {
@@ -220,20 +285,15 @@ body.has-results {
     letter-spacing: 1px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
 }
 
-.header p {
-    color: var(--muted);
-    font-size: 13px;
-    margin-top: 6px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
 .search-container {
-    width: 100%;
-    max-width: 600px;
-    margin-bottom: 40px;
+    width: min(70vw, 1200px);
+    max-width: 1200px;
+    margin: 0 auto 30px;
+    margin-bottom: 0;
     position: relative;
 }
 
@@ -314,6 +374,8 @@ body.has-results {
     }
 
     .search-container {
+        width: 100%;
+        max-width: 100%;
         margin: 0 10px 30px;
     }
 
@@ -322,9 +384,8 @@ body.has-results {
         align-items: flex-start;
         gap: 12px;
     }
-    
+
     .results-header .new-search-btn {
         align-self: flex-end;
     }
 }
-

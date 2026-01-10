@@ -8,6 +8,10 @@
     --text: #ffffff;
     --input: rgba(255, 255, 255, 0.08);
     --input-focus: rgba(255, 255, 255, 0.14);
+    --accent: #5fc8ff;
+    --accent-strong: #87d4ff;
+    --font-display: 'Georgia', 'Times New Roman', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 * {
@@ -17,7 +21,7 @@
 }
 
 body {
-    font-family: 'Georgia', 'Times New Roman', serif;
+    font-family: var(--font-display);
     background: var(--bg);
     min-height: 100vh;
     display: flex;

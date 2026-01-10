@@ -21,7 +21,7 @@ def example_list_all_sections():
             for i, section in enumerate(article.sections, 1):
                 indent = "  " * (section.level - 1)
                 content_preview = section.content[:80] + "..." if len(section.content) > 80 else section.content
-                print(f"{indent}{i}. [{Level {section.level}}] {section.title}")
+                print(f"{indent}{i}. [Level {section.level}] {section.title}")
                 print(f"{indent}   {content_preview}\n")
         
         except (ArticleNotFound, RequestError) as e:

@@ -10,9 +10,10 @@ from app.services.article_fetcher import scrape_wikipedia, fetch_grokipedia_arti
 from app.services.comparison_service import (
     compare_articles,
     generate_grokipedia_tldr,
+    generate_grokipedia_article,
     generate_wikipedia_summary
 )
-from app.services.edits_service import generate_edit_suggestions
+from app.services.edits_service import generate_edit_suggestions, XAIRateLimitError
 
 
 bp = Blueprint('main', __name__)
@@ -255,9 +256,61 @@ def edits():
             'edits': edits_output
         })
 
+    except XAIRateLimitError as e:
+        payload = {'error': str(e)}
+        if getattr(e, 'retry_after_seconds', None) is not None:
+            payload['retry_after_seconds'] = e.retry_after_seconds
+        return jsonify(payload), 429
     except (RuntimeError, ValueError) as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         print(f"Error in edits endpoint: {e}")
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+
+@bp.route('/create', methods=['POST'])
+def create():
+    """Handle Grokipedia article creation from Wikipedia."""
+    try:
+        data = request.json or {}
+        article_url = (data.get('article_url') or '').strip()
+
+        if not article_url:
+            return jsonify({'error': 'Please provide a Wikipedia URL'}), 400
+
+        source = detect_source(article_url)
+        wikipedia_url = None
+
+        if source == 'wikipedia':
+            wikipedia_url = article_url
+        elif source == 'grokipedia':
+            wikipedia_url = convert_to_other_source(article_url)
+            if not wikipedia_url:
+                return jsonify({'error': 'Could not extract Wikipedia title from URL'}), 400
+        else:
+            resolved_slug = resolve_local_slug_if_available(article_url)
+            if resolved_slug:
+                wikipedia_url = convert_to_other_source(
+                    f"https://grokipedia.com/page/{resolved_slug}"
+                )
+            else:
+                return jsonify({'error': 'Provide a Wikipedia URL or recognizable article name'}), 400
+
+        wikipedia_data = scrape_wikipedia(wikipedia_url)
+        if not wikipedia_data:
+            return jsonify({'error': 'Wikipedia article not found'}), 404
+
+        grokipedia_draft = generate_grokipedia_article(wikipedia_data, wikipedia_url)
+        if not grokipedia_draft:
+            return jsonify({'error': 'Failed to generate Grokipedia draft'}), 502
+
+        return jsonify({
+            'wikipedia': wikipedia_data,
+            'wikipedia_url': wikipedia_url,
+            'grokipedia_draft': grokipedia_draft
+        })
+
+    except Exception as e:
+        print(f"Error in create endpoint: {e}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 

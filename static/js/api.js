@@ -53,6 +53,35 @@ export async function requestEdits(articleUrl) {
 }
 
 /**
+ * Request Grokipedia article creation from Wikipedia
+ * @param {string} articleUrl - Wikipedia URL or title
+ * @returns {Promise<Object>} Creation payload
+ */
+export async function requestCreate(articleUrl) {
+    try {
+        const response = await fetch('/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                article_url: articleUrl
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create Grokipedia article');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Create error:', error);
+        throw error;
+    }
+}
+
+/**
  * Compare articles
  * @param {string} articleUrl - URL of the article to compare
  * @returns {Promise<Object>} Comparison data
