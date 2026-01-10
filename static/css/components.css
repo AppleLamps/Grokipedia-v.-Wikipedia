@@ -871,7 +871,6 @@
 .grok-article {
     background: transparent;
     padding: 8px 0 40px;
-    border-top: 1px solid var(--panel-brd);
     margin-top: 12px;
     animation: fade-up 0.6s ease;
 }

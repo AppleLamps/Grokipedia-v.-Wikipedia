@@ -27,8 +27,9 @@ def index():
 
 @bp.route('/search', methods=['GET'])
 def search_articles():
-    """Search for Grokipedia articles by keyword with smart ranking"""
+    """Search for Grokipedia articles by keyword - optimized for speed"""
     from app.utils.sdk_manager import is_sdk_available
+    from app.utils.url_parser import detect_source, extract_article_title
     
     query = request.args.get('q', '').strip()
     limit = int(request.args.get('limit', 10))
@@ -36,103 +37,45 @@ def search_articles():
     if not query:
         return jsonify({'results': []})
     
+    # Check if query is a Wikipedia or Grokipedia URL - extract slug
+    source = detect_source(query)
+    if source in ('wikipedia', 'grokipedia'):
+        slug = extract_article_title(query)
+        if slug:
+            # Search for this exact slug
+            query = slug.replace('_', ' ')
+    
     if not is_sdk_available():
-        print("ERROR: SDK not available")
         return jsonify({'error': 'SDK not available'}), 500
     
     try:
-        # Use cached client (much faster - no reloading index)
         client = get_cached_client()
         if not client:
-            print("ERROR: SDK client unavailable")
             return jsonify({'error': 'SDK client unavailable'}), 500
         
-        # Use non-fuzzy search first for better relevance
-        # Fuzzy search is too aggressive and returns irrelevant results
-        exact_slugs = client.search_slug(query, limit=limit * 3, fuzzy=False)
+        # Single search call - SDK already ranks by relevance
+        # Use exact search first, fall back to fuzzy only if needed
+        slugs = client.search_slug(query, limit=limit, fuzzy=False)
         
-        # If we get very few results, try fuzzy as fallback
-        if len(exact_slugs) < 5:
-            fuzzy_slugs = client.search_slug(query, limit=limit * 5, fuzzy=True)
-            # Combine, removing duplicates
-            all_slugs = exact_slugs + [s for s in fuzzy_slugs if s not in exact_slugs]
-        else:
-            all_slugs = exact_slugs
+        # Only do fuzzy search if exact search returns too few results
+        if len(slugs) < limit:
+            fuzzy_slugs = client.search_slug(query, limit=limit, fuzzy=True)
+            # Merge without duplicates, exact matches first
+            seen = set(slugs)
+            for slug in fuzzy_slugs:
+                if slug not in seen and len(slugs) < limit:
+                    slugs.append(slug)
+                    seen.add(slug)
         
-        # Smart ranking: prioritize exact matches, prefix matches, and word matches
-        query_lower = query.lower()
-        query_words = query_lower.split()
-        
-        scored_results = []
-        for slug in all_slugs:
-            slug_lower = slug.lower().replace('_', ' ')
-            slug_words = slug_lower.split()
-            score = 0
-            
-            # Exact match (highest priority)
-            if slug_lower == query_lower:
-                score = 10000
-            # Starts with query (very high priority)
-            elif slug_lower.startswith(query_lower):
-                score = 5000
-            # Any word in slug exactly matches query
-            elif query_lower in slug_words:
-                score = 3000
-            # Contains query as substring in any word
-            elif any(query_lower in word for word in slug_words):
-                score = 1000
-            # Contains query as whole phrase anywhere
-            elif query_lower in slug_lower:
-                score = 500
-            # Word-based matching (less strict)
-            else:
-                # Check if any query word is in any slug word
-                matching_words = 0
-                for qw in query_words:
-                    for sw in slug_words:
-                        if qw in sw:
-                            matching_words += 1
-                            # Bonus if word starts match
-                            if sw.startswith(qw):
-                                matching_words += 0.5
-                            break
-                
-                if matching_words > 0:
-                    score = 100 * matching_words
-                else:
-                    # Very low relevance - skip
-                    continue
-            
-            # Prefer shorter titles (more specific)
-            length_penalty = len(slug_words) * 2
-            score = score - length_penalty
-            
-            # Prefer titles where query word appears earlier
-            try:
-                first_match_position = next(i for i, word in enumerate(slug_words) 
-                                           if query_lower in word.lower())
-                position_bonus = max(0, 100 - (first_match_position * 20))
-                score += position_bonus
-            except StopIteration:
-                pass
-            
-            scored_results.append({
-                'slug': slug,
-                'title': slug.replace('_', ' '),
-                'url': f"https://grokipedia.com/page/{slug}",
-                'score': score
-            })
-        
-        # Sort by score and take top results
-        scored_results.sort(key=lambda x: x['score'], reverse=True)
-        results = [{'slug': r['slug'], 'title': r['title'], 'url': r['url']} 
-                  for r in scored_results[:limit]]
+        # Convert to response format directly - SDK already sorted by relevance
+        results = [
+            {'slug': slug, 'title': slug.replace('_', ' '), 'url': f"https://grokipedia.com/page/{slug}"}
+            for slug in slugs
+        ]
         
         return jsonify({'results': results})
     except Exception as e:
         print(f"Error searching articles: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 

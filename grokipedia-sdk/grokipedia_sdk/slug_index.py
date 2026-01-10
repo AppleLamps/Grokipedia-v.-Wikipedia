@@ -49,6 +49,7 @@ class SlugIndex:
         self.use_bktree = use_bktree and HAS_BKTREE
         self._index: Optional[Dict[str, str]] = None
         self._all_slugs: Optional[List[str]] = None
+        self._slug_dates: Optional[Dict[str, str]] = None  # slug -> lastmod date
         self._bk_tree: Optional['BKTree'] = None
         self._load_errors: List[Tuple[str, Exception]] = []  # Track file load errors
     
@@ -178,6 +179,7 @@ class SlugIndex:
             return self._index
         
         self._index = {}
+        self._slug_dates = {}
         unique_slugs = set()
         self._load_errors = []  # Reset errors for this load
         
@@ -194,19 +196,31 @@ class SlugIndex:
         
         for sitemap_dir in sorted(self.links_dir.glob("sitemap-*")):
             names_file = sitemap_dir / "names.txt"
+            dates_file = sitemap_dir / "dates.txt"
             if names_file.exists():
                 total_files += 1
                 try:
+                    # Load names
                     with open(names_file, 'r', encoding='utf-8') as f:
-                        for line_num, line in enumerate(f, 1):
-                            slug = line.strip()
-                            if slug:
-                                unique_slugs.add(slug)
-                                # Store normalized version for flexible matching
-                                normalized = self._normalize_name(slug)
-                                self._index[normalized] = slug
-                                # Also store the lowercase original for exact matches
-                                self._index[slug.lower()] = slug
+                        names_lines = [line.strip() for line in f]
+                    
+                    # Load dates if available
+                    dates_lines = []
+                    if dates_file.exists():
+                        with open(dates_file, 'r', encoding='utf-8') as f:
+                            dates_lines = [line.strip() for line in f]
+                    
+                    for i, slug in enumerate(names_lines):
+                        if slug:
+                            unique_slugs.add(slug)
+                            # Store normalized version for flexible matching
+                            normalized = self._normalize_name(slug)
+                            self._index[normalized] = slug
+                            # Also store the lowercase original for exact matches
+                            self._index[slug.lower()] = slug
+                            # Store date if available
+                            if i < len(dates_lines) and dates_lines[i]:
+                                self._slug_dates[slug] = dates_lines[i]
                 except (IOError, OSError) as e:
                     # Handle file access errors (permissions, disk issues, etc.)
                     failed_files += 1
@@ -218,8 +232,7 @@ class SlugIndex:
                     # Handle encoding issues in the file
                     failed_files += 1
                     error_msg = (
-                        f"Invalid UTF-8 encoding in {names_file} "
-                        f"(likely at line {line_num}): {e}"
+                        f"Invalid UTF-8 encoding in {names_file}: {e}"
                     )
                     self._load_errors.append((str(names_file), e))
                     logger.error(error_msg)
@@ -287,7 +300,31 @@ class SlugIndex:
         """
         return self._load_errors.copy()
     
-    def search(self, query: str, limit: int = 10, fuzzy: bool = True, min_similarity: float = 0.6) -> List[str]:
+    def get_slug_date(self, slug: str) -> Optional[str]:
+        """
+        Get the lastmod date for a slug.
+        
+        Args:
+            slug: The article slug
+            
+        Returns:
+            Date string (YYYY-MM-DD) or None if not available
+        """
+        self.load()
+        return self._slug_dates.get(slug) if self._slug_dates else None
+    
+    def _sort_by_date(self, slugs: List[str]) -> List[str]:
+        """Sort slugs by lastmod date (most recent first)."""
+        if not self._slug_dates:
+            return slugs
+        
+        def date_key(slug: str) -> str:
+            # Return date or empty string (sorts to end)
+            return self._slug_dates.get(slug, "")
+        
+        return sorted(slugs, key=date_key, reverse=True)
+    
+    def search(self, query: str, limit: int = 10, fuzzy: bool = True, min_similarity: float = 0.6, sort_by_date: bool = False) -> List[str]:
         """
         Search for matching slugs with optimized fuzzy matching.
         
@@ -296,9 +333,10 @@ class SlugIndex:
             limit: Maximum number of results to return
             fuzzy: Enable fuzzy matching if no exact matches found
             min_similarity: Minimum similarity score for fuzzy matching (0.0 to 1.0)
+            sort_by_date: Sort results by lastmod date (most recent first)
             
         Returns:
-            List of matching slugs, ordered by relevance
+            List of matching slugs, ordered by relevance (or date if sort_by_date=True)
             
         Example:
             >>> index = SlugIndex()
@@ -410,6 +448,10 @@ class SlugIndex:
                     if slug not in seen:
                         matches.append(slug)
                         seen.add(slug)
+        
+        # Apply date sorting if requested
+        if sort_by_date and matches:
+            matches = self._sort_by_date(matches)
         
         return matches
     

@@ -503,7 +503,7 @@ class Client:
     
     # Slug search and discovery methods
     
-    def search_slug(self, query: str, limit: int = 10, fuzzy: bool = True) -> List[str]:
+    def search_slug(self, query: str, limit: int = 10, fuzzy: bool = True, sort_by_date: bool = False) -> List[str]:
         """
         Search for article slugs matching a query.
         
@@ -514,9 +514,10 @@ class Client:
             query: Search query (partial name or slug, case-insensitive)
             limit: Maximum number of results to return (default: 10)
             fuzzy: Enable fuzzy matching for approximate matches (default: True)
+            sort_by_date: Sort results by lastmod date, most recent first (default: False)
             
         Returns:
-            List of matching slugs ordered by relevance
+            List of matching slugs ordered by relevance (or date if sort_by_date=True)
             
         Example:
             >>> client = Client()
@@ -525,7 +526,7 @@ class Client:
             >>> client.search_slug("artificial intelligence", limit=5)
             ['Artificial_Intelligence', 'Artificial_Neural_Network', ...]
         """
-        return self._slug_index.search(query, limit=limit, fuzzy=fuzzy)
+        return self._slug_index.search(query, limit=limit, fuzzy=fuzzy, sort_by_date=sort_by_date)
     
     def find_slug(self, query: str) -> Optional[str]:
         """

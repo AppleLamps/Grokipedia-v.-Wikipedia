@@ -5,6 +5,8 @@
 let searchTimeout = null;
 let currentSuggestions = [];
 let selectedSuggestionIndex = -1;
+let currentSearchId = 0; // Track which search is current to ignore stale responses
+let lastSelectedValue = null; // Track selected value to prevent reopening
 
 // Import dependencies
 import { escapeHtml } from './utils.js';
@@ -18,29 +20,44 @@ import { escapeHtml } from './utils.js';
 export function initSearch(inputElement, suggestionsContainer, onSelect) {
     if (!inputElement || !suggestionsContainer) return;
 
-    // Handle input events with debouncing
+    // Handle input events - search with tiny debounce to prevent flicker
     inputElement.addEventListener('input', (e) => {
         const query = e.target.value.trim();
-        
+
         if (searchTimeout) {
             clearTimeout(searchTimeout);
         }
 
-        if (query.length < 2) {
+        if (query.length < 1) {
             hideSuggestions(suggestionsContainer);
+            lastSelectedValue = null;
             return;
         }
 
+        // Don't reopen if user hasn't changed the selected value
+        if (e.target.value === lastSelectedValue) {
+            return;
+        }
+
+        // Tiny debounce (50ms) - still feels instant but prevents race conditions
         searchTimeout = setTimeout(async () => {
+            const searchId = ++currentSearchId;
+
             try {
                 const { searchArticles } = await import('./api.js');
                 const results = await searchArticles(query, 8);
-                showSuggestions(suggestionsContainer, results, inputElement, onSelect);
+
+                // Only update UI if this is still the most recent search
+                if (searchId === currentSearchId) {
+                    showSuggestions(suggestionsContainer, results, inputElement, onSelect);
+                }
             } catch (error) {
                 console.error('Search error:', error);
-                hideSuggestions(suggestionsContainer);
+                if (searchId === currentSearchId) {
+                    hideSuggestions(suggestionsContainer);
+                }
             }
-        }, 300);
+        }, 50);
     });
 
     // Handle keyboard navigation
@@ -78,9 +95,9 @@ export function initSearch(inputElement, suggestionsContainer, onSelect) {
 function showSuggestions(container, results, inputElement, onSelect) {
     currentSuggestions = results;
     selectedSuggestionIndex = -1;
-    
+
     const emptyMessage = container.querySelector('.suggestions-empty');
-    
+
     if (results.length === 0) {
         if (emptyMessage) {
             emptyMessage.classList.remove('hidden');
@@ -88,15 +105,15 @@ function showSuggestions(container, results, inputElement, onSelect) {
         container.classList.remove('hidden');
         return;
     }
-    
+
     if (emptyMessage) {
         emptyMessage.classList.add('hidden');
     }
-    
+
     // Clear existing suggestions (except empty message)
     const existingItems = container.querySelectorAll('.suggestion-item');
     existingItems.forEach(item => item.remove());
-    
+
     results.forEach((result, index) => {
         const item = document.createElement('div');
         item.className = 'suggestion-item';
@@ -155,6 +172,7 @@ function updateSuggestionHighlight(container) {
  */
 function selectSuggestion(result, inputElement, container, onSelect) {
     inputElement.value = result.url;
+    lastSelectedValue = result.url; // Remember what was selected
     hideSuggestions(container);
     if (onSelect) {
         onSelect(result);
