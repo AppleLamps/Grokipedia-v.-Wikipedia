@@ -904,6 +904,28 @@
     font-size: 11px;
 }
 
+.grok-article-meta .meta-icon.existing-icon {
+    width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: 0;
+    color: var(--accent);
+}
+
+.grok-article-meta .meta-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 12px;
+    margin-left: 8px;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.grok-article-meta .meta-link:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
 .grok-article-meta .meta-time {
     color: var(--muted-2);
 }

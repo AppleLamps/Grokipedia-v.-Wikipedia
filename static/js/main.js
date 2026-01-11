@@ -27,7 +27,7 @@ let lastWikiCopyText = '';
 let lastEditsCopyText = '';
 let lastCreateCopyText = '';
 let currentComparisonData = null;
-let currentMode = 'compare';
+let currentMode = 'create';
 
 /**
  * Initialize the application
@@ -442,11 +442,37 @@ function displayEditsResults(data) {
 function displayCreateResults(data) {
     currentComparisonData = null;
     document.body.classList.add('create-mode-results');
-    const draft = data.grokipedia_draft || '';
-    displayCreatedArticle(draft, {
-        timeLabel: 'just now'
-    });
-    lastCreateCopyText = draft;
+
+    // Check if this is an existing article from Grokipedia
+    if (data.existing_article && data.grokipedia) {
+        // Display existing Grokipedia article
+        const articleData = data.grokipedia;
+        const content = articleData.full_text || articleData.summary || '';
+        const title = articleData.title || '';
+        const tldr = articleData.tldr || '';
+
+        // Format as markdown-like content
+        let formattedContent = `# ${title}\n\n`;
+        if (tldr) {
+            formattedContent += `**TLDR:** ${tldr}\n\n---\n\n`;
+        }
+        formattedContent += content;
+
+        displayCreatedArticle(formattedContent, {
+            timeLabel: 'existing article',
+            isExisting: true,
+            grokipediaUrl: data.grokipedia_url,
+            message: data.message
+        });
+        lastCreateCopyText = formattedContent;
+    } else {
+        // Display newly generated draft
+        const draft = data.grokipedia_draft || '';
+        displayCreatedArticle(draft, {
+            timeLabel: 'just now'
+        });
+        lastCreateCopyText = draft;
+    }
 
     const createBox = document.getElementById('create-box');
     if (createBox) {

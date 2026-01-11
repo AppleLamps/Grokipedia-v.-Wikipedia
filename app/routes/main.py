@@ -214,6 +214,9 @@ def edits():
 @bp.route('/create', methods=['POST'])
 def create():
     """Handle Grokipedia article creation from Wikipedia."""
+    from app.utils.sdk_manager import is_sdk_available
+    from app.utils.url_parser import extract_article_title
+    
     try:
         data = request.json or {}
         article_url = (data.get('article_url') or '').strip()
@@ -223,22 +226,68 @@ def create():
 
         source = detect_source(article_url)
         wikipedia_url = None
+        search_slug = None
 
         if source == 'wikipedia':
             wikipedia_url = article_url
+            search_slug = extract_article_title(article_url)
         elif source == 'grokipedia':
             wikipedia_url = convert_to_other_source(article_url)
+            search_slug = extract_article_title(article_url)
             if not wikipedia_url:
                 return jsonify({'error': 'Could not extract Wikipedia title from URL'}), 400
         else:
             resolved_slug = resolve_local_slug_if_available(article_url)
             if resolved_slug:
+                search_slug = resolved_slug
                 wikipedia_url = convert_to_other_source(
                     f"https://grokipedia.com/page/{resolved_slug}"
                 )
             else:
-                return jsonify({'error': 'Provide a Wikipedia URL or recognizable article name'}), 400
+                # Use the input directly as the search term
+                search_slug = article_url.replace(' ', '_')
+                # Try to construct a Wikipedia URL from the input
+                wikipedia_url = f"https://en.wikipedia.org/wiki/{search_slug}"
 
+        # Check if Grokipedia already has this article
+        if search_slug and is_sdk_available():
+            try:
+                client = get_cached_client()
+                if client:
+                    # Search for exact match first
+                    search_term = search_slug.replace('_', ' ')
+                    slugs = client.search_slug(search_term, limit=5, fuzzy=False)
+                    
+                    # Check for exact match (case-insensitive)
+                    exact_match = None
+                    normalized_search = search_slug.lower().replace('_', ' ')
+                    for slug in slugs:
+                        if slug.lower().replace('_', ' ') == normalized_search:
+                            exact_match = slug
+                            break
+                    
+                    if exact_match:
+                        # Grokipedia already has this article - fetch it
+                        grokipedia_url = f"https://grokipedia.com/page/{exact_match}"
+                        grokipedia_data = fetch_grokipedia_article(grokipedia_url)
+                        
+                        if grokipedia_data:
+                            # Generate TLDR for the existing article
+                            grokipedia_tldr = generate_grokipedia_tldr(grokipedia_data)
+                            if grokipedia_tldr:
+                                grokipedia_data['tldr'] = grokipedia_tldr
+                            
+                            return jsonify({
+                                'existing_article': True,
+                                'grokipedia': grokipedia_data,
+                                'grokipedia_url': grokipedia_url,
+                                'message': f'Grokipedia already has an article on "{exact_match.replace("_", " ")}"'
+                            })
+            except Exception as e:
+                print(f"Error checking for existing article: {e}")
+                # Continue to generation if check fails
+
+        # No existing article found - generate a new one
         wikipedia_data = scrape_wikipedia(wikipedia_url)
         if not wikipedia_data:
             return jsonify({'error': 'Wikipedia article not found'}), 404
@@ -248,6 +297,7 @@ def create():
             return jsonify({'error': 'Failed to generate Grokipedia draft'}), 502
 
         return jsonify({
+            'existing_article': False,
             'wikipedia': wikipedia_data,
             'wikipedia_url': wikipedia_url,
             'grokipedia_draft': grokipedia_draft

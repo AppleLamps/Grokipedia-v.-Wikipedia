@@ -115,11 +115,11 @@ export function displayArticle(containerId, articleData, contentKey = 'summary')
     if (articleData) {
         const title = articleData.title || '';
         const url = articleData.url || '';
-        
+
         // Determine what content to display based on container type
         let displayContent = '';
         let contentLabel = '';
-        
+
         if (containerId === 'grokipedia-content') {
             // Show TLDR for Grokipedia
             displayContent = articleData.tldr || articleData[contentKey] || '';
@@ -133,17 +133,17 @@ export function displayArticle(containerId, articleData, contentKey = 'summary')
             displayContent = articleData[contentKey] || '';
             contentLabel = 'Content';
         }
-        
+
         const sections = articleData.sections || [];
-        
-        const titleHtml = url 
+
+        const titleHtml = url
             ? `<div class="title"><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a></div>`
             : `<div class="title">${escapeHtml(title)}</div>`;
-        
-        const urlHtml = url 
+
+        const urlHtml = url
             ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="article-url">${escapeHtml(url)}</a>`
             : '';
-        
+
         container.innerHTML = `
             ${titleHtml}
             ${urlHtml}
@@ -158,7 +158,7 @@ export function displayArticle(containerId, articleData, contentKey = 'summary')
             </div>
             ` : ''}
         `;
-        
+
         // Update scroll indicators after content is rendered
         setTimeout(() => {
             updateScrollIndicators(containerId);
@@ -180,18 +180,18 @@ export function displayArticle(containerId, articleData, contentKey = 'summary')
 function updateScrollIndicators(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    
+
     const articleBox = container.closest('.article-box');
     if (!articleBox) return;
-    
+
     // Use the article box itself for scroll calculations
     const scrollTop = articleBox.scrollTop;
     const scrollHeight = articleBox.scrollHeight;
     const clientHeight = articleBox.clientHeight;
-    
+
     // Check if scrollable
     const isScrollable = scrollHeight > clientHeight;
-    
+
     if (isScrollable) {
         // Check top scroll
         if (scrollTop > 10) {
@@ -199,7 +199,7 @@ function updateScrollIndicators(containerId) {
         } else {
             articleBox.classList.remove('scrollable-top');
         }
-        
+
         // Check bottom scroll
         if (scrollTop < scrollHeight - clientHeight - 10) {
             articleBox.classList.add('scrollable-bottom');
@@ -265,11 +265,27 @@ export function displayCreatedArticle(markdown, meta = {}) {
 
     if (createMeta) {
         const timeLabel = meta.timeLabel || 'just now';
-        createMeta.innerHTML = `
-            <span class="meta-icon">&#10003;</span>
-            <span>Fact-checked by Grok</span>
-            <span class="meta-time">${escapeHtml(timeLabel)}</span>
-        `;
+
+        if (meta.isExisting) {
+            // Existing article from Grokipedia - use SVG icon
+            const bookIcon = `<svg class="meta-icon existing-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
+            let metaHtml = `
+                ${bookIcon}
+                <span>Found in Grokipedia</span>
+                <span class="meta-time">${escapeHtml(timeLabel)}</span>
+            `;
+            if (meta.grokipediaUrl) {
+                metaHtml += `<a href="${escapeHtml(meta.grokipediaUrl)}" target="_blank" class="meta-link">View on Grokipedia ↗</a>`;
+            }
+            createMeta.innerHTML = metaHtml;
+        } else {
+            // Newly generated article
+            createMeta.innerHTML = `
+                <span class="meta-icon">&#10003;</span>
+                <span>Fact-checked by Grok</span>
+                <span class="meta-time">${escapeHtml(timeLabel)}</span>
+            `;
+        }
     }
 }
 
