@@ -1,11 +1,12 @@
 """Slug index for fast article lookup"""
 
 import asyncio
+import bisect
 import heapq
 import logging
 import random
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 try:
     from rapidfuzz import fuzz
@@ -52,6 +53,10 @@ class SlugIndex:
         self._slug_dates: Optional[Dict[str, str]] = None  # slug -> lastmod date
         self._bk_tree: Optional['BKTree'] = None
         self._load_errors: List[Tuple[str, Exception]] = []  # Track file load errors
+        self._all_slugs_lower_sorted: Optional[List[str]] = None
+        self._all_slugs_sorted_by_lower: Optional[List[str]] = None
+        self._token_index: Optional[Dict[str, List[str]]] = None
+        self._token_keys_sorted: Optional[List[str]] = None
     
     @staticmethod
     def _normalize_name(slug: str) -> str:
@@ -252,6 +257,10 @@ class SlugIndex:
         
         # Store sorted list of all unique slugs
         self._all_slugs = sorted(unique_slugs)
+        self._all_slugs_lower_sorted = None
+        self._all_slugs_sorted_by_lower = None
+        self._token_index = None
+        self._token_keys_sorted = None
         
         # Build BK-Tree for O(log n) fuzzy search (if enabled)
         if self.use_bktree and HAS_BKTREE:
@@ -259,8 +268,91 @@ class SlugIndex:
             for slug in self._all_slugs:
                 normalized = self._normalize_name(slug)
                 self._bk_tree.add(slug, normalized)
-        
+
         return self._index
+
+    def _build_token_index(self) -> None:
+        """Build a token-to-slugs index for fast multi-word search."""
+        if self._token_index is not None:
+            return
+        self._token_index = {}
+        self._token_keys_sorted = []
+
+        if not self._all_slugs:
+            return
+
+        for slug in self._all_slugs:
+            normalized = self._normalize_name(slug)
+            tokens = [token for token in normalized.split() if len(token) >= 2]
+            for token in tokens:
+                self._token_index.setdefault(token, []).append(slug)
+
+        self._token_keys_sorted = sorted(self._token_index.keys())
+
+    def _collect_token_candidates(
+        self,
+        query_normalized: str,
+        limit: int,
+        max_candidates: int = 5000,
+    ) -> List[str]:
+        """Gather top matches using token index for speed."""
+        tokens = [token for token in query_normalized.split() if len(token) >= 2]
+        if not tokens:
+            return []
+
+        self._build_token_index()
+        if not self._token_index:
+            return []
+
+        token_index = self._token_index
+        candidates: Optional[Set[str]] = None
+
+        if len(tokens) == 1 and len(tokens[0]) < 4:
+            prefix = tokens[0]
+            if not self._token_keys_sorted:
+                return []
+            upper_bound = prefix + '{'
+            start = bisect.bisect_left(self._token_keys_sorted, prefix)
+            end = bisect.bisect_left(self._token_keys_sorted, upper_bound)
+            for token in self._token_keys_sorted[start:end]:
+                slugs = token_index.get(token, [])
+                if not slugs:
+                    continue
+                if candidates is None:
+                    candidates = set(slugs)
+                else:
+                    candidates.update(slugs)
+                if candidates and len(candidates) >= max_candidates:
+                    break
+        else:
+            tokens_by_size = sorted(tokens, key=lambda t: len(token_index.get(t, [])))
+            for token in tokens_by_size:
+                slugs = token_index.get(token)
+                if not slugs:
+                    return []
+                if candidates is None:
+                    candidates = set(slugs)
+                else:
+                    candidates.intersection_update(slugs)
+                if not candidates:
+                    return []
+
+        if not candidates:
+            return []
+
+        ranked: List[Tuple[Tuple[float, float, float, float], str]] = []
+        for slug in candidates:
+            normalized = self._normalize_name(slug)
+            substring_score = self._substring_match_score(normalized, query_normalized)
+            if substring_score is not None:
+                rank = (2, float(substring_score[0]), float(substring_score[1]), float(substring_score[2]))
+            else:
+                similarity = self._compute_similarity_score(query_normalized, normalized)
+                rank = (1, similarity, float(-len(normalized)), 0.0)
+            ranked.append((rank, slug))
+
+        ranked.sort(reverse=True)
+        return [slug for _, slug in ranked[:limit]]
     
     async def load_async(self) -> Dict[str, str]:
         """
@@ -359,12 +451,12 @@ class SlugIndex:
                 return []
             return self._all_slugs[:limit]
 
-        # Strategy 1: Exact/substring matches ranked by relevance
+        # Strategy 1: Token-based matches ranked by relevance
         matches: List[str] = []
         seen = set()
 
-        substring_candidates = self._collect_substring_candidates(index, query_normalized, limit)
-        for slug in substring_candidates:
+        token_candidates = self._collect_token_candidates(query_normalized, limit)
+        for slug in token_candidates:
             if slug not in seen:
                 matches.append(slug)
                 seen.add(slug)
@@ -505,27 +597,48 @@ class SlugIndex:
             
         Returns:
             List of article slugs matching the prefix
-            
+
         Example:
             >>> index = SlugIndex()
             >>> index.list_by_prefix(prefix="Artificial", limit=20)
             ['Artificial_Intelligence', 'Artificial_Neural_Network', ...]
         """
         self.load()  # Ensure index is loaded
-        
+
         if not self._all_slugs:
             return []
-        
+
+        if limit <= 0:
+            return []
+
         prefix_lower = prefix.lower()
-        matches = []
-        
-        for slug in self._all_slugs:
-            if slug.lower().startswith(prefix_lower):
-                matches.append(slug)
-                if len(matches) >= limit:
-                    break
-        
-        return matches
+        if not prefix_lower:
+            return self._all_slugs[:limit]
+
+        self._ensure_prefix_cache()
+        if not self._all_slugs_lower_sorted or not self._all_slugs_sorted_by_lower:
+            return []
+
+        upper_bound = prefix_lower + '{'
+        start = bisect.bisect_left(self._all_slugs_lower_sorted, prefix_lower)
+        end = bisect.bisect_left(self._all_slugs_lower_sorted, upper_bound)
+
+        matches = self._all_slugs_sorted_by_lower[start:end]
+        return matches[:limit]
+
+    def _ensure_prefix_cache(self) -> None:
+        """Build a lowercase-sorted slug list for fast prefix searches."""
+        if self._all_slugs is None:
+            return
+        if self._all_slugs_lower_sorted is not None:
+            return
+
+        pairs = sorted(
+            ((slug.lower(), slug) for slug in self._all_slugs),
+            key=lambda item: item[0]
+        )
+        self._all_slugs_lower_sorted = [item[0] for item in pairs]
+        self._all_slugs_sorted_by_lower = [item[1] for item in pairs]
     
     def get_total_count(self) -> int:
         """

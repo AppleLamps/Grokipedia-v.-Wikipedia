@@ -52,20 +52,24 @@ def search_articles():
         client = get_cached_client()
         if not client:
             return jsonify({'error': 'SDK client unavailable'}), 500
-        
-        # Single search call - SDK already ranks by relevance
-        # Use exact search first, fall back to fuzzy only if needed
-        slugs = client.search_slug(query, limit=limit, fuzzy=False)
-        
-        # Only do fuzzy search if exact search returns too few results
-        if len(slugs) < limit:
-            fuzzy_slugs = client.search_slug(query, limit=limit, fuzzy=True)
-            # Merge without duplicates, exact matches first
-            seen = set(slugs)
-            for slug in fuzzy_slugs:
-                if slug not in seen and len(slugs) < limit:
-                    slugs.append(slug)
-                    seen.add(slug)
+
+        query_length = len(query)
+        if query_length <= 2:
+            prefix_query = query.replace(' ', '_')
+            slugs = client.list_available_articles(prefix=prefix_query, limit=limit)
+        else:
+            # Use exact search first, fall back to fuzzy only if needed
+            slugs = client.search_slug(query, limit=limit, fuzzy=False)
+
+            # Only do fuzzy search if exact search returns too few results
+            if len(slugs) < limit:
+                fuzzy_slugs = client.search_slug(query, limit=limit, fuzzy=True)
+                # Merge without duplicates, exact matches first
+                seen = set(slugs)
+                for slug in fuzzy_slugs:
+                    if slug not in seen and len(slugs) < limit:
+                        slugs.append(slug)
+                        seen.add(slug)
         
         # Convert to response format directly - SDK already sorted by relevance
         results = [

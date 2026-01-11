@@ -1,8 +1,44 @@
 """Article fetching services for Wikipedia and Grokipedia"""
 import requests
+import os
 from urllib.parse import urlparse
 from app.utils.url_parser import extract_article_title
 from app.utils.sdk_manager import get_sdk_client, is_sdk_available, ArticleNotFound, RequestError
+
+# Firecrawl API configuration
+FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY', 'fc-bb448f06d5394f32a108a8c24deb4f0e')
+FIRECRAWL_API_URL = "https://api.firecrawl.dev/v1/scrape"
+
+
+def scrape_with_firecrawl(url):
+    """Scrape a URL using Firecrawl API and return clean markdown."""
+    try:
+        payload = {
+            "url": url,
+            "onlyMainContent": True,
+            "formats": ["markdown"]
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {FIRECRAWL_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(FIRECRAWL_API_URL, json=payload, headers=headers, timeout=60)
+        response.raise_for_status()
+        
+        data = response.json()
+        if data.get('success') and data.get('data'):
+            return {
+                'markdown': data['data'].get('markdown', ''),
+                'title': data['data'].get('metadata', {}).get('title', ''),
+                'description': data['data'].get('metadata', {}).get('description', ''),
+                'url': url
+            }
+        return None
+    except Exception as e:
+        print(f"Firecrawl error: {e}")
+        return None
 
 
 def scrape_wikipedia(url):
@@ -77,11 +113,43 @@ def scrape_wikipedia(url):
 
 
 def fetch_grokipedia_article(url):
-    """Fetch Grokipedia article using the SDK.
+    """Fetch Grokipedia article using Firecrawl API.
 
-    Uses the Grokipedia SDK to scrape articles from grokipedia.com.
-    Automatically handles slug resolution and fuzzy matching.
+    Uses Firecrawl to get clean markdown content from grokipedia.com.
+    Falls back to SDK if Firecrawl fails.
     """
+    # Try Firecrawl first for clean markdown
+    firecrawl_result = scrape_with_firecrawl(url)
+    if firecrawl_result and firecrawl_result.get('markdown'):
+        markdown = firecrawl_result['markdown']
+        title = firecrawl_result.get('title', '')
+        
+        # Clean up title - remove " | Grokipedia" suffix if present
+        if ' | Grokipedia' in title:
+            title = title.split(' | Grokipedia')[0].strip()
+        elif ' - Grokipedia' in title:
+            title = title.split(' - Grokipedia')[0].strip()
+        
+        # Extract summary from first paragraph of markdown
+        lines = markdown.split('\n')
+        summary = ''
+        for line in lines:
+            line = line.strip()
+            # Skip headers, empty lines, and short lines
+            if line and not line.startswith('#') and len(line) > 100:
+                summary = line[:500]  # First substantial paragraph
+                break
+        
+        return {
+            'title': title,
+            'summary': summary,
+            'sections': [],  # Firecrawl doesn't provide TOC separately
+            'url': url,
+            'full_text': markdown  # Clean markdown!
+        }
+    
+    # Fallback to SDK if Firecrawl fails
+    print("Firecrawl failed, falling back to SDK...")
     if not is_sdk_available():
         print("Grokipedia SDK not available")
         return None
@@ -93,23 +161,17 @@ def fetch_grokipedia_article(url):
         if not slug:
             return None
 
-        # Create a new client for article fetching (need fresh connection)
-        # Note: Search uses cached client, but article fetching needs new instance
         client = get_sdk_client()
         try:
-            # Try to get full article first
             article = client.get_article(slug)
-            
-            # Convert SDK Article model to dict format expected by frontend
             return {
                 'title': article.title,
                 'summary': article.summary,
-                'sections': article.table_of_contents[:5],  # Limit to 5 sections
-                'url': str(article.url),  # Convert HttpUrl to string for JSON serialization
+                'sections': article.table_of_contents[:5],
+                'url': str(article.url),
                 'full_text': article.full_content
             }
         except ArticleNotFound:
-            # If article not found, try slug search as fallback
             resolved_slug = client.find_slug(slug)
             if resolved_slug and resolved_slug != slug:
                 try:

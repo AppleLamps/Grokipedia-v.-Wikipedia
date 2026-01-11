@@ -447,12 +447,20 @@ function displayCreateResults(data) {
     if (data.existing_article && data.grokipedia) {
         // Display existing Grokipedia article
         const articleData = data.grokipedia;
-        const content = articleData.full_text || articleData.summary || '';
         const title = articleData.title || '';
         const tldr = articleData.tldr || '';
 
-        // Format as markdown-like content
-        let formattedContent = `# ${title}\n\n`;
+        // Content is now clean markdown from Firecrawl
+        let content = articleData.full_text || articleData.summary || '';
+
+        // Build final formatted content
+        let formattedContent = '';
+
+        // Only add title if content doesn't already start with a header
+        if (!content.trim().startsWith('#')) {
+            formattedContent = `# ${title}\n\n`;
+        }
+
         if (tldr) {
             formattedContent += `**TLDR:** ${tldr}\n\n---\n\n`;
         }

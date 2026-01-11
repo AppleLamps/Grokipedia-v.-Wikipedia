@@ -7,9 +7,11 @@ let currentSuggestions = [];
 let selectedSuggestionIndex = -1;
 let currentSearchId = 0; // Track which search is current to ignore stale responses
 let lastSelectedValue = null; // Track selected value to prevent reopening
+let searchController = null;
 
 // Import dependencies
 import { escapeHtml } from './utils.js';
+import { searchArticles } from './api.js';
 
 /**
  * Initialize search functionality
@@ -27,6 +29,10 @@ export function initSearch(inputElement, suggestionsContainer, onSelect) {
         if (searchTimeout) {
             clearTimeout(searchTimeout);
         }
+        if (searchController) {
+            searchController.abort();
+            searchController = null;
+        }
 
         if (query.length < 1) {
             hideSuggestions(suggestionsContainer);
@@ -42,16 +48,20 @@ export function initSearch(inputElement, suggestionsContainer, onSelect) {
         // Tiny debounce (50ms) - still feels instant but prevents race conditions
         searchTimeout = setTimeout(async () => {
             const searchId = ++currentSearchId;
+            const controller = new AbortController();
+            searchController = controller;
 
             try {
-                const { searchArticles } = await import('./api.js');
-                const results = await searchArticles(query, 8);
+                const results = await searchArticles(query, 8, controller.signal);
 
                 // Only update UI if this is still the most recent search
                 if (searchId === currentSearchId) {
                     showSuggestions(suggestionsContainer, results, inputElement, onSelect);
                 }
             } catch (error) {
+                if (error?.name === 'AbortError') {
+                    return;
+                }
                 console.error('Search error:', error);
                 if (searchId === currentSearchId) {
                     hideSuggestions(suggestionsContainer);

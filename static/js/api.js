@@ -8,9 +8,12 @@
  * @param {number} limit - Maximum number of results
  * @returns {Promise<Array>} Array of search results
  */
-export async function searchArticles(query, limit = 8) {
+export async function searchArticles(query, limit = 8, signal) {
     try {
-        const response = await fetch(`/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+        const response = await fetch(
+            `/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+            { signal }
+        );
         const data = await response.json();
         
         if (!response.ok) {
