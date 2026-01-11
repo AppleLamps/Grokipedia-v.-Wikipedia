@@ -8,3 +8,4 @@ pydantic>=2.0.0
 rapidfuzz>=3.0.0
 lxml>=4.9.0
 gunicorn==21.2.0
+gevent>=24.2.1
