@@ -1,5 +1,5 @@
 # Use Python 3.11 slim image
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Set working directory
 WORKDIR /app
@@ -42,5 +42,6 @@ ENV PORT=8080
 # Expose port
 EXPOSE 8080
 
-# Run the application - use shell form for variable expansion
-CMD gunicorn run:app --bind 0.0.0.0:${PORT:-8080} --timeout 300 --graceful-timeout 120 --workers 1 --threads 2
+# Run the application
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["exec gunicorn run:app --bind 0.0.0.0:${PORT:-8080} --timeout 300 --graceful-timeout 120 --workers 1 --threads 2"]
