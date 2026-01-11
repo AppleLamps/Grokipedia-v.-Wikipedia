@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
+env
+.env
+.env.local
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.egg-info
+dist
+build
+
+# Documentation (not needed in production)
+docs/
+*.md
+!README.md
+
+# Tests (not needed in production)
+tests/
+**/test_*.py
+pytest.ini
+
+# Local development files
+setup.bat
+setup.sh
+app.py.old
+
+# Pre-built database (will be built during Docker build)
+app/slugs.db
+*.db-wal
+*.db-shm

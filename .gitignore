@@ -26,3 +26,8 @@ env/
 .DS_Store
 Thumbs.db
 .env.local
+
+# Generated SQLite database (built during Docker build)
+app/slugs.db
+*.db-wal
+*.db-shm
