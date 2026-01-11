@@ -22,6 +22,16 @@ export function renderMarkdown(md) {
     const flushComparisonPair = () => { if (inComparisonPair) { html += '</div>'; inComparisonPair = false; } };
 
     const formatInline = (t) => {
+        // Unescape common markdown escapes from scraped content
+        t = t.replace(/\\+([\[\]()]|\\)/g, '$1');
+
+        const linkTokens = [];
+        t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, text, url) => {
+            const token = `___LINK_${linkTokens.length}___`;
+            linkTokens.push({ text, url });
+            return token;
+        });
+
         // Replace W: and G: patterns with placeholder tokens BEFORE escaping
         t = t.replace(/\bW:\s*/g, '___BADGE_W___');
         t = t.replace(/\bG:\s*/g, '___BADGE_G___');
@@ -47,13 +57,38 @@ export function renderMarkdown(md) {
         t = t.replace(/___BOLD_END___/g, '</strong>');
         t = t.replace(/___ITALIC_START___/g, '<em>');
         t = t.replace(/___ITALIC_END___/g, '</em>');
-        
+
+        linkTokens.forEach((link, index) => {
+            const safeText = escapeHtml(link.text);
+            const safeUrl = escapeHtml(link.url);
+            t = t.replace(
+                `___LINK_${index}___`,
+                `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeText}</a>`
+            );
+        });
+
+        // Convert numeric citations to superscript
+        t = t.replace(/\[(\d{1,3})\]/g, '<sup>[$1]</sup>');
+
         return t;
     };
 
     for (const raw of lines) {
         const line = raw.trim();
         if (!line) { flushList(); continue; }
+
+        if (line.match(/^\[\d+\]:\s*\S+/)) {
+            flushList();
+            flushComparisonPair();
+            continue;
+        }
+
+        if (line.match(/^---+$/)) {
+            flushList();
+            flushComparisonPair();
+            html += '<hr>';
+            continue;
+        }
 
         // Check for Before/After pattern
         const beforeAfterMatch = line.match(/Before\s*\(W\):\s*(.+?)\s*-\s*After\s*\(G\):\s*(.+?)(?:\s*-\s*Change:\s*(.+))?$/i);

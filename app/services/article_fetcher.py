@@ -1,6 +1,7 @@
 """Article fetching services for Wikipedia and Grokipedia"""
 import requests
 import os
+import re
 from urllib.parse import urlparse
 from app.utils.url_parser import extract_article_title
 from app.utils.sdk_manager import get_sdk_client, is_sdk_available, ArticleNotFound, RequestError
@@ -8,6 +9,75 @@ from app.utils.sdk_manager import get_sdk_client, is_sdk_available, ArticleNotFo
 # Firecrawl API configuration
 FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY', 'fc-bb448f06d5394f32a108a8c24deb4f0e')
 FIRECRAWL_API_URL = "https://api.firecrawl.dev/v1/scrape"
+
+FIRECRAWL_CHROME_LINES = {
+    "search",
+    "suggest article",
+    "edits history",
+    "edit history",
+    "new search",
+    "sign in",
+    "log in",
+    "login",
+    "logout",
+    "log out",
+    "home",
+    "menu"
+}
+
+FIRECRAWL_SHORTCUT_LINES = {
+    "cmd+k",
+    "command+k",
+    "command + k",
+    "ctrl+k",
+    "ctrl + k",
+    "ctrl k",
+    "cmd k",
+    "\u2318k",
+    "\u2318 k"
+}
+
+FOOTNOTE_DEFINITION_RE = re.compile(r'^\[\d+\]:\s*\S+', re.IGNORECASE)
+FACT_CHECK_LINE_RE = re.compile(r'^fact-checked by\b', re.IGNORECASE)
+
+
+def clean_firecrawl_markdown(markdown, title=""):
+    """Strip UI chrome and clean Firecrawl markdown for display."""
+    if not markdown:
+        return markdown
+
+    markdown = re.sub(r'\\+([\[\]()]|\\)', r'\1', markdown)
+
+    title_normalized = (title or "").strip().lower()
+    cleaned_lines = []
+    blank_count = 0
+
+    for raw in markdown.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            blank_count += 1
+            if blank_count <= 2:
+                cleaned_lines.append('')
+            continue
+
+        blank_count = 0
+        normalized = re.sub(r'\s+', ' ', stripped).lower()
+
+        if normalized in FIRECRAWL_CHROME_LINES:
+            continue
+        if normalized in FIRECRAWL_SHORTCUT_LINES:
+            continue
+        if FACT_CHECK_LINE_RE.match(normalized):
+            continue
+        if FOOTNOTE_DEFINITION_RE.match(stripped):
+            continue
+
+        if title_normalized and normalized == title_normalized and not stripped.startswith('#'):
+            continue
+
+        cleaned_lines.append(stripped)
+
+    return '\n'.join(cleaned_lines).strip()
 
 
 def scrape_with_firecrawl(url):
@@ -123,13 +193,15 @@ def fetch_grokipedia_article(url):
     if firecrawl_result and firecrawl_result.get('markdown'):
         markdown = firecrawl_result['markdown']
         title = firecrawl_result.get('title', '')
-        
+
         # Clean up title - remove " | Grokipedia" suffix if present
         if ' | Grokipedia' in title:
             title = title.split(' | Grokipedia')[0].strip()
         elif ' - Grokipedia' in title:
             title = title.split(' - Grokipedia')[0].strip()
-        
+
+        markdown = clean_firecrawl_markdown(markdown, title=title)
+
         # Extract summary from first paragraph of markdown
         lines = markdown.split('\n')
         summary = ''
