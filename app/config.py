@@ -27,7 +27,9 @@ class Config:
         'grokipedia_sdk',
         'links'
     )
+    # Lightweight mode disables BK-tree for faster startup (uses ~90% less memory)
+    # Auto-enabled on Railway, or set GROKIPEDIA_LIGHTWEIGHT=true
     LIGHTWEIGHT_MODE = os.getenv('GROKIPEDIA_LIGHTWEIGHT', '').strip().lower() in (
         '1', 'true', 'yes', 'on'
-    )
+    ) or bool(os.environ.get('RAILWAY_ENVIRONMENT'))
 
