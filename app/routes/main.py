@@ -18,6 +18,7 @@ from app.services.comparison_service import (
     generate_wikipedia_summary
 )
 from app.services.edits_service import generate_edit_suggestions, XAIRateLimitError
+from app.services.biography_service import generate_biography
 
 logger = logging.getLogger(__name__)
 
@@ -317,5 +318,44 @@ def create():
 
     except Exception as e:
         logger.exception("Error in create endpoint: %s", e)
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+
+@bp.route('/biography', methods=['POST'])
+def biography():
+    """Generate a Grokipedia biography for a person based on their X profile and online presence."""
+    try:
+        data = request.json or {}
+        topic = (data.get('topic') or '').strip()
+        x_username = (data.get('x_username') or '').strip()
+        details = (data.get('details') or '').strip()
+
+        if not topic and not x_username:
+            return jsonify({'error': 'Please provide a name/topic or X username'}), 400
+
+        # If only X username provided, use it as the topic
+        if not topic and x_username:
+            topic = f"@{x_username.lstrip('@')}"
+
+        logger.info("Generating biography for: %s (X: @%s)", topic, x_username or "N/A")
+
+        biography_content = generate_biography(
+            name=topic,
+            x_username=x_username if x_username else None,
+            additional_context=details if details else None
+        )
+
+        if not biography_content:
+            return jsonify({'error': 'Failed to generate biography. Please try again.'}), 502
+
+        return jsonify({
+            'success': True,
+            'topic': topic,
+            'x_username': x_username if x_username else None,
+            'biography': biography_content
+        })
+
+    except Exception as e:
+        logger.exception("Error in biography endpoint: %s", e)
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 

@@ -278,6 +278,14 @@ export function displayCreatedArticle(markdown, meta = {}) {
                 metaHtml += `<a href="${escapeHtml(meta.grokipediaUrl)}" target="_blank" class="meta-link">View on Grokipedia ↗</a>`;
             }
             createMeta.innerHTML = metaHtml;
+        } else if (meta.customMeta) {
+            // Custom meta text (e.g., for biographies)
+            const xIcon = `<svg class="meta-icon existing-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
+            createMeta.innerHTML = `
+                ${xIcon}
+                <span>${escapeHtml(meta.customMeta)}</span>
+                <span class="meta-time">${escapeHtml(timeLabel)}</span>
+            `;
         } else {
             // Newly generated article
             createMeta.innerHTML = `

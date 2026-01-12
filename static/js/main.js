@@ -30,6 +30,25 @@ let currentComparisonData = null;
 let currentMode = 'create';
 
 /**
+ * Toggle theme between dark and light mode
+ */
+function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+    const isLight = document.body.classList.contains('light-mode');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+}
+
+/**
+ * Initialize theme from localStorage
+ */
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-mode');
+    }
+}
+
+/**
  * Initialize the application
  */
 export function init() {
@@ -49,17 +68,182 @@ export function init() {
     const copyEditsBtn = document.getElementById('copyEditsBtn');
     const copyCreateBtn = document.getElementById('copyCreateBtn');
     const resultsSearchInput = document.getElementById('results-article-url');
+    const suggestArticleBtn = document.getElementById('suggestArticleBtn');
+    const initialThemeToggle = document.getElementById('initialThemeToggle');
+    const themeToggle = document.getElementById('themeToggle');
 
     if (!articleInput || !compareBtn) {
         console.error('Required elements not found');
         return;
     }
 
+    // Initialize theme
+    initTheme();
+
     // Initialize sidebar
     initSidebar();
 
     // Update sidebar badge on load
     updateSidebarBadge();
+
+    // Suggest Article modal
+    const suggestModal = document.getElementById('suggestModal');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+    const modalCancelBtn = document.getElementById('modalCancelBtn');
+    const modalSubmitBtn = document.getElementById('modalSubmitBtn');
+    const articleTopicInput = document.getElementById('articleTopic');
+
+    if (suggestArticleBtn && suggestModal) {
+        suggestArticleBtn.addEventListener('click', () => {
+            suggestModal.classList.add('active');
+            if (articleTopicInput) articleTopicInput.focus();
+        });
+    }
+
+    // Close modal handlers
+    const closeModal = () => {
+        if (suggestModal) {
+            suggestModal.classList.remove('active');
+            // Reset form
+            if (articleTopicInput) articleTopicInput.value = '';
+            const xUsernameInput = document.getElementById('xUsername');
+            if (xUsernameInput) xUsernameInput.value = '';
+            const detailsInput = document.getElementById('additionalDetails');
+            if (detailsInput) detailsInput.value = '';
+            // Reset loading overlay
+            const loadingOverlay = document.getElementById('modalLoadingOverlay');
+            if (loadingOverlay) loadingOverlay.classList.remove('active');
+        }
+    };
+
+    if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeModal);
+    if (modalCancelBtn) modalCancelBtn.addEventListener('click', closeModal);
+
+    // Close on overlay click
+    if (suggestModal) {
+        suggestModal.addEventListener('click', (e) => {
+            if (e.target === suggestModal) closeModal();
+        });
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && suggestModal?.classList.contains('active')) {
+            closeModal();
+        }
+    });
+
+    // Submit suggestion / Generate Biography
+    if (modalSubmitBtn) {
+        modalSubmitBtn.addEventListener('click', async () => {
+            const topic = articleTopicInput?.value.trim();
+            const xUsername = document.getElementById('xUsername')?.value.trim();
+            const details = document.getElementById('additionalDetails')?.value.trim();
+
+            if (!topic && !xUsername) {
+                articleTopicInput?.focus();
+                return;
+            }
+
+            // Show loading overlay with animated messages
+            const loadingOverlay = document.getElementById('modalLoadingOverlay');
+            const loadingText = document.getElementById('modalLoadingText');
+
+            const loadingMessages = xUsername ? [
+                'Searching X posts',
+                'Analyzing @' + xUsername.replace('@', ''),
+                'Reading their timeline',
+                'Finding key moments',
+                'Discovering interests',
+                'Mapping connections',
+                'Researching background',
+                'Cross-referencing sources',
+                'Building profile',
+                'Writing biography',
+                'Adding details',
+                'Polishing prose',
+                'Almost done'
+            ] : [
+                'Researching topic',
+                'Gathering information',
+                'Analyzing sources',
+                'Cross-referencing facts',
+                'Building article',
+                'Writing content',
+                'Adding context',
+                'Finalizing draft'
+            ];
+
+            let messageIndex = 0;
+            if (loadingOverlay) loadingOverlay.classList.add('active');
+            if (loadingText) loadingText.textContent = loadingMessages[0];
+
+            const messageInterval = setInterval(() => {
+                messageIndex = (messageIndex + 1) % loadingMessages.length;
+                if (loadingText) {
+                    loadingText.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingText.textContent = loadingMessages[messageIndex];
+                        loadingText.style.opacity = '1';
+                    }, 150);
+                }
+            }, 2500);
+
+            // Disable buttons
+            modalSubmitBtn.disabled = true;
+            if (modalCancelBtn) modalCancelBtn.disabled = true;
+
+            try {
+                // Generate biography via backend
+                const response = await fetch('/biography', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic, x_username: xUsername, details })
+                });
+
+                clearInterval(messageInterval);
+                const data = await response.json();
+
+                if (response.ok && data.biography) {
+                    if (loadingText) loadingText.textContent = 'Done!';
+
+                    // Close modal and display the biography
+                    setTimeout(() => {
+                        if (loadingOverlay) loadingOverlay.classList.remove('active');
+                        closeModal();
+                        modalSubmitBtn.disabled = false;
+                        if (modalCancelBtn) modalCancelBtn.disabled = false;
+
+                        // Display the generated biography
+                        displayBiography(data.biography, data.topic, data.x_username);
+                    }, 600);
+                } else {
+                    throw new Error(data.error || 'Failed to generate biography');
+                }
+            } catch (error) {
+                clearInterval(messageInterval);
+                console.error('Biography generation error:', error);
+
+                if (loadingOverlay) loadingOverlay.classList.remove('active');
+                modalSubmitBtn.disabled = false;
+                if (modalCancelBtn) modalCancelBtn.disabled = false;
+                modalSubmitBtn.textContent = 'Error - Try Again';
+                setTimeout(() => {
+                    modalSubmitBtn.textContent = 'Submit Suggestion';
+                }, 2000);
+            }
+        });
+    }
+
+    // Theme toggle for initial view
+    if (initialThemeToggle) {
+        initialThemeToggle.addEventListener('click', toggleTheme);
+    }
+
+    // Theme toggle for results view
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
 
     // Initialize collapsible sections
     initCollapsibleSections();
@@ -559,6 +743,37 @@ function displayCreateResults(data) {
         });
         lastCreateCopyText = draft;
     }
+
+    const createBox = document.getElementById('create-box');
+    if (createBox) {
+        createBox.classList.remove('hidden');
+    }
+
+    showResultsView();
+    updateModeUI();
+}
+
+/**
+ * Display a generated biography
+ * @param {string} biography - The biography content in Markdown
+ * @param {string} topic - The topic/name of the person
+ * @param {string} xUsername - Optional X username
+ */
+function displayBiography(biography, topic, xUsername) {
+    currentComparisonData = null;
+    currentMode = 'create';
+    document.body.classList.add('create-mode-results');
+
+    // Build the meta information
+    const metaLabel = xUsername
+        ? `Biography generated from @${xUsername.replace('@', '')}'s X profile`
+        : 'Biography generated by Grok';
+
+    displayCreatedArticle(biography, {
+        timeLabel: 'just now',
+        customMeta: metaLabel
+    });
+    lastCreateCopyText = biography;
 
     const createBox = document.getElementById('create-box');
     if (createBox) {

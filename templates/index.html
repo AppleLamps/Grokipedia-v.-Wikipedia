@@ -43,6 +43,20 @@
         <span class="sidebar-badge" id="sidebarBadge" style="display: none;">0</span>
     </button>
 
+    <!-- Top Right Header Actions (Initial View) -->
+    <div class="top-header-actions" id="topHeaderActions">
+        <button class="header-icon-btn" id="initialThemeToggle" aria-label="Toggle theme"
+            title="Toggle dark/light mode">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+        </button>
+        <button class="suggest-article-btn" id="suggestArticleBtn" aria-label="Suggest Article"
+            title="Suggest a new article">
+            Suggest Article
+        </button>
+    </div>
+
     <div class="container" id="mainContainer">
         <div class="initial-view" id="initialView">
             <div class="header">
@@ -279,6 +293,84 @@
                     </button>
                 </div>
                 <div class="grok-article-content" id="create-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suggest Article Modal -->
+    <div class="modal-overlay" id="suggestModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Suggest an Article</h2>
+                <button class="modal-close-btn" id="modalCloseBtn" aria-label="Close modal">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+            <p class="modal-description">Help us expand Grokipedia by suggesting new topics you'd like to see covered.
+                Your input helps us create better content for everyone.</p>
+
+            <div class="modal-form">
+                <div class="form-group">
+                    <label for="articleTopic">Article Topic</label>
+                    <input type="text" id="articleTopic" class="form-input"
+                        placeholder="e.g., Quantum Computing, Marie Curie, Photosynthesis">
+                </div>
+
+                <div class="form-group">
+                    <div class="label-row">
+                        <label for="xUsername">X Username</label>
+                        <span class="optional-tag">(For biographies)</span>
+                    </div>
+                    <div class="x-input-wrapper">
+                        <span class="x-input-prefix">@</span>
+                        <input type="text" id="xUsername" class="form-input x-input" placeholder="username">
+                    </div>
+                    <p class="form-hint">Enter an X username to create a detailed biography based on their posts and
+                        online presence.</p>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-row">
+                        <label for="additionalDetails">Additional Details</label>
+                        <span class="optional-tag">(Optional)</span>
+                    </div>
+                    <textarea id="additionalDetails" class="form-textarea"
+                        placeholder="What specific aspects would you like to learn about? Why is this topic important?"
+                        rows="4"></textarea>
+                </div>
+
+                <div class="tips-section">
+                    <div class="tips-header">
+                        <svg class="tips-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path
+                                d="M9 18h6M10 22h4M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z">
+                            </path>
+                        </svg>
+                        <span>Tips for great suggestions</span>
+                    </div>
+                    <ul class="tips-list">
+                        <li>Be specific about the topic or subject</li>
+                        <li>For biographies, enter their X username for detailed research</li>
+                        <li>Mention any specific areas of interest</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" id="modalCancelBtn">Cancel</button>
+                <button class="modal-btn modal-btn-submit" id="modalSubmitBtn">Submit Suggestion</button>
+            </div>
+
+            <!-- Generating Animation Overlay -->
+            <div class="modal-loading-overlay" id="modalLoadingOverlay">
+                <div class="modal-loading-content">
+                    <div class="modal-spinner"></div>
+                    <p class="modal-loading-text" id="modalLoadingText">Researching...</p>
+                    <p class="modal-loading-subtext">This may take a minute</p>
+                </div>
             </div>
         </div>
     </div>
